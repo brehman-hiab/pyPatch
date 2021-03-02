@@ -1,5 +1,6 @@
 import socket
 import json
+import time
 
 
 class BB_DataIn():
@@ -73,10 +74,11 @@ sig = [41.42, 52.17, 53.64, 37.98, 35.059998, 0.0]
 socket_sendHandle = setUpUDP(UDP_IP="127.0.0.1",UDP_PORT=4444)
 DataOut_object = BB_DataOut()
 
-
+socket_receivehandle = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+socket_receivehandle.bind(("127.0.0.1", 5555))
 
 #socket_handle = setUpUDP(UDP_IP = "127.0.0.1",UDP_PORT = 5555)
-#DataIn_object = BB_DataIn()
+DataIn_object = BB_DataIn()
 counter = 0
 while (counter<100000):
     print("Inside while")
@@ -87,12 +89,14 @@ while (counter<100000):
     #print(DataOut_object.__dict__)
     #print(json.dumps(DataOut_object.__dict__))
     socket_sendHandle.sendto(MESSAGE.encode(),("127.0.0.1",4444))
-    #rx_data_dict = rxData(socket_handle)
+ 
+    rx_data_dict = rxData(socket_receivehandle)
     #rx_data_dict = rxData(socket_sendHandle)
-    #print(rx_data_dict)
+    print(rx_data_dict)
 #    DataIn_object = getMappedDistToObject(rx_data_dict)
 #    print(DataIn_object.Aj)
     counter = counter +1
+    time.sleep(0.1)
 #
 #tearDownUDP(socket_handle)
 tearDownUDP(socket_sendHandle)
