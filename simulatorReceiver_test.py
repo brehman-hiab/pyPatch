@@ -28,7 +28,7 @@ def setUpUDP(UDP_IP = "127.0.0.1",UDP_PORT = 4444):
                      socket.SOCK_DGRAM) # UDP
         #sock.settimeout(10.1)
         #sock.setblocking(1)
-        sock.bind((UDP_IP, UDP_PORT))
+        #sock.bind((UDP_IP, UDP_PORT))
         return sock
 
 def rxData(sock):
@@ -65,7 +65,7 @@ def tearDownUDP(sock):
         print("Inside tear down UDP")
         sock.close()
 
-PWM =[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+PWM =[100.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 sig = [41.42, 52.17, 53.64, 37.98, 35.059998, 0.0]
 
 
