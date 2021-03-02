@@ -96,7 +96,7 @@ while (counter<100000):
 #    DataIn_object = getMappedDistToObject(rx_data_dict)
 #    print(DataIn_object.Aj)
     counter = counter +1
-    time.sleep(0.1)
+    #time.sleep(0.1)
 #
 #tearDownUDP(socket_handle)
 tearDownUDP(socket_sendHandle)
