@@ -2,33 +2,31 @@ import socket
 import json
 import time
 
-
+#This class is part of the protocol at which Simulator is publishing information
+#If Black Baron changes this and Simulator adopt then, this script needs to updated too
 class BB_DataIn():
         At =[0.0,0.0,0.0]
         Aj = [0.0,0.0,0.0,0.0,0.0]
         Pressure = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
         Length = [0.0,0.0,0.0,0.0]
-        Rcl =[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
+        Lever =[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
         Counter = int(0)
         RemoteControlButtons = int(0)
         SimulatedMs = int(0)
-
+#Same as above this needs to match the simulator protocol
 class BB_DataOut():
         def __init__(self):
-            self.Ems = 0
-            self.Ctrl = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+            self.Ticks = 0
+            self.SpoolOpenings = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
             self.Signals=[0.0,0.0,0.0,0.0,0.0,0.0]
             self.Counter=0
             self.Menu=0
         
-#Use port 5555 to recive this from simulator and 4444 from Blackbaron, later from Sumulink
+#Use port 5555 to recive this from simulator and 4444 from Sumulink/Python Scripts
 def setUpUDP(UDP_IP = "127.0.0.1",UDP_PORT = 4444):
         print("Inside Set Up UDP")
         sock = socket.socket(socket.AF_INET, # Internet
                      socket.SOCK_DGRAM) # UDP
-        #sock.settimeout(10.1)
-        #sock.setblocking(1)
-        #sock.bind((UDP_IP, UDP_PORT))
         return sock
 
 def rxData(sock):
@@ -65,48 +63,32 @@ def tearDownUDP(sock):
         print("Inside tear down UDP")
         sock.close()
 
+#This is dummy message for testing
 PWM =[100.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 sig = [41.42, 52.17, 53.64, 37.98, 35.059998, 0.0]
 
-
-
-
-socket_sendHandle = setUpUDP(UDP_IP="127.0.0.1",UDP_PORT=4444)
+#Above classes objects
+DataIn_object = BB_DataIn()
 DataOut_object = BB_DataOut()
 
+#Need to create an handle for scoket to send msg to Simulator
+socket_sendHandle = setUpUDP(UDP_IP="127.0.0.1",UDP_PORT=4444)
+
+#Need to create an handle for scoket to get msg from Simulator
 socket_receivehandle = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 socket_receivehandle.bind(("127.0.0.1", 5555))
 
-#socket_handle = setUpUDP(UDP_IP = "127.0.0.1",UDP_PORT = 5555)
-DataIn_object = BB_DataIn()
 counter = 0
 while (counter<100000):
-    print("Inside while")
-    DataOut_object.Ctrl = PWM
-    DataOut_object.Signals=sig
-    DataOut_object.Counter=counter
-    MESSAGE = json.dumps(DataOut_object.__dict__)
-    #print(DataOut_object.__dict__)
-    #print(json.dumps(DataOut_object.__dict__))
-    socket_sendHandle.sendto(MESSAGE.encode(),("127.0.0.1",4444))
- 
-    rx_data_dict = rxData(socket_receivehandle)
-    #rx_data_dict = rxData(socket_sendHandle)
-    print(rx_data_dict)
-#    DataIn_object = getMappedDistToObject(rx_data_dict)
-#    print(DataIn_object.Aj)
+    #print("Inside while")
+    DataOut_object.SpoolOpenings = PWM #Assigning dummy msg to the object
+    DataOut_object.Signals=sig #Assigning dummy msg to the object
+    DataOut_object.Counter=counter #Assigning dummy msg to the object
+    MESSAGE = json.dumps(DataOut_object.__dict__) #Converting to json
+    socket_sendHandle.sendto(MESSAGE.encode(),("127.0.0.1",4444)) #Sending to simulator an encoded msg 
+    rx_data_dict = rxData(socket_receivehandle) #Getting msg decoded from simulator 
+    print(rx_data_dict) #Prinding recevide info
     counter = counter +1
-    #time.sleep(0.1)
-#
-#tearDownUDP(socket_handle)
-tearDownUDP(socket_sendHandle)
 
-
-
-
-
-
-#RcLever=getLeverMsg(BB_dataIn.Rcl)
-#print(BB_dataIn.Aj)
-
-#print("Data %s" % BB_DataIn_object.Aj)
+tearDownUDP(socket_sendHandle) #closing the socket
+tearDownUDP(socket_receivehandle) #closing the socket
