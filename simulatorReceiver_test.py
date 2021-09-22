@@ -64,7 +64,7 @@ def tearDownUDP(sock):
         sock.close()
 
 #This is dummy message for testing
-PWM =[100.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+PWM =[0.0, -50.0, 50.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 sig = [41.42, 52.17, 53.64, 37.98, 35.059998, 0.0]
 
 #Above classes objects
@@ -76,10 +76,10 @@ socket_sendHandle = setUpUDP(UDP_IP="127.0.0.1",UDP_PORT=4444)
 
 #Need to create an handle for scoket to get msg from Simulator
 socket_receivehandle = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-socket_receivehandle.bind(("127.0.0.1", 5555))
+socket_receivehandle.bind(("127.0.0.1", 5555)) #Only required for receiving handle
 
 counter = 0
-while (counter<100000):
+while (counter<1000):
     #print("Inside while")
     DataOut_object.SpoolOpenings = PWM #Assigning dummy msg to the object
     DataOut_object.Signals=sig #Assigning dummy msg to the object
@@ -89,6 +89,7 @@ while (counter<100000):
     rx_data_dict = rxData(socket_receivehandle) #Getting msg decoded from simulator 
     print(rx_data_dict) #Prinding recevide info
     counter = counter +1
+
 
 tearDownUDP(socket_sendHandle) #closing the socket
 tearDownUDP(socket_receivehandle) #closing the socket
