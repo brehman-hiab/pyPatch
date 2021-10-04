@@ -18,7 +18,6 @@ def BB_DataOutDummy(): #dictionary data
                 'Menu':0
         }
           
-
 #Above classes objects
 DummyControlData = BB_DataOutDummy()
 model = NEOSimIO()

@@ -32,6 +32,7 @@ class NEOSimIO():
         # module to receive data continuously
         self.recvThread = dataThread(self.kEvent, self.port_recv, config.UDP_RECV_BUFF)
         self.recvThread.start() # enabling data receiving
+        self.kEvent.wait(timeout=1) #wait for dataThread to run
         # socket for sending commands to sim, opening port and sending stop
         self.soc_send =  socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         print("Socket UDP (for sending commands) initialized...")
@@ -45,7 +46,9 @@ class NEOSimIO():
         self.verbose = verbose
         self.StartTime = time.time()
         self.Tfinal = Tf #will stop running if time exceeds this value
-        self.currentTime = self.checkptCurrentTime()
+        self.checkptCurrentTime()
+        self.lastcheckpointTime = self.currentTime 
+        self.checkpoint_dt = config.SAMPLE_TIME
         # self.log_keys = ['time', 'u', 'data'] #save these variables
         self.logs = {'time':[], # time
                       'u':[], # sent commands to sim
@@ -55,7 +58,6 @@ class NEOSimIO():
           self.log_path = './temp/'
         os.makedirs(self.log_path, exist_ok=True)
         self.file_path =  self.log_path + '_data.pkl'
-
 
     def checkptCurrentTime(self):
         self.currentTime = time.time() - self.StartTime
@@ -84,9 +86,12 @@ class NEOSimIO():
             print("Command Send Error:", e)
     
     def run(self):
-        while not self.kEvent.is_set():
-          self.currentTime = time.time() - self.StartTime
-          # //? add time control functions here if needed
+        while not self.kEvent.wait(self.checkpoint_dt/2):
+          self.checkptCurrentTime()          
+          ## time control functions 
+          # while (self.currentTime - self.lastcheckpointTime) <= self.checkpoint_dt: 
+          #     self.checkptCurrentTime()
+          # self.lastcheckpointTime = self.currentTime
           if (self.currentTime > self.Tfinal): 
             print(f"Timeout of {self.Tfinal:.1f} reached... ")    
             self.safeCompletion()
@@ -102,8 +107,8 @@ class NEOSimIO():
         self.safeCompletion()
 
     def print_states(self):
-      #print selected or all states
-      print(f'Time: {self.currentTime:.3f} - States: {self.currentData} - Action: {self.u_control}')
+      #print selected or all states ################
+      print(f'Time: {self.currentTime:.2f} - States: {self.currentData}\n Action: {self.u_control}')
 
     def safeCompletion(self):
         """
@@ -150,14 +155,15 @@ class dataThread(threading.Thread):
     self.PORT = port_recv
     self.UDP_RECV_BUFF = recv_buffer
     self.HOST = ""
-    self.SAMPLE_TIME = config.SAMPLE_TIME 
+    self.RECV_TIME = config.SAMPLE_TIME/5
 
   def run(self):
     '''Data collection'''
     self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    # self.sock.settimeout(5)
     self.bind_socket()
     rxData = None
-    while not self.kEvent.is_set():
+    while not self.kEvent.wait(timeout=self.RECV_TIME): # better than self.kEvent.is_set() + time.sleep(SAMPLE_TIME)
         # "collect data"
         # time.sleep(self.SAMPLE_TIME)
         rxData, _ = self.sock.recvfrom(self.UDP_RECV_BUFF)
