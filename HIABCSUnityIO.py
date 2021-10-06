@@ -33,6 +33,7 @@ class NEOSimIO():
         self.recvThread = dataThread(self.kEvent, self.port_recv, config.UDP_RECV_BUFF)
         self.recvThread.start() # enabling data receiving
         self.kEvent.wait(timeout=1) #wait for dataThread to run
+        # self.sendThread = dataSendThread(self.recvThread, config.UDP_PORT_SEND_EXTRA) #extra socket to send (used in Simulink)
         # socket for sending commands to sim, opening port and sending stop
         self.soc_send =  socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         print("Socket UDP (for sending commands) initialized...")
@@ -42,7 +43,7 @@ class NEOSimIO():
         ### for data collection and control
         self.controller = controller 
         if self.controller is None:
-          self.controller = self.passiveController
+          self.controller = self.keyboardController
         self.verbose = verbose
         self.StartTime = time.time()
         self.Tfinal = Tf #will stop running if time exceeds this value
@@ -98,17 +99,38 @@ class NEOSimIO():
 
           self.currentData = self.get_data()
           self.u_control = self.controller(self)
-          
+          self.send_cmd(self.u_control)
           if self.verbose > 0:
               self.print_states()
           #log data
           self.logCurrentData()
         #finish up    
         self.safeCompletion()
+    def getLeverMsg(self):
+      return self.currentData['Lever']
+
+    def select_states(self, data):
+      Lever = self.getLeverMsg()[0:4]
+      JointAng = data['Aj'][0:3]
+      BoomExt = [data['Length'][2]] # second boom extension length 
+      return JointAng + BoomExt # Lever + JointAng + BoomExt
+
+    def select_actions(self, u):
+      return u['SpoolOpenings'][0:4]
+
+    def get_states(self):
+      return self.select_states(self.currentData)
 
     def print_states(self):
-      #print selected or all states ################
-      print(f'Time: {self.currentTime:.2f} - States: {self.currentData}\n Action: {self.u_control}')
+      #print selected states
+      states = [f'{s:+07.2f}' for s in self.get_states()]
+      states = " | ".join(states)
+      actions = [f'{a:+04.0f}' for a in self.select_actions(self.u_control)]
+      actions = " | ".join(actions)
+      print(f't: {self.currentTime:07.2f} - States: {states} - Control: {actions}')
+
+      # or all states ################
+      # print(f'Time: {self.currentTime:.2f} - States: {self.currentData}\n Action: {self.u_control}')
 
     def safeCompletion(self):
         """
@@ -142,7 +164,21 @@ class NEOSimIO():
       #for testing functionality
       return self.get_cmd_stop()
 
-            
+    def keyboardController(self, voidInput):
+      u = self.getLeverMsg()[0:4]
+      data_out = self.assemble_command_u(u)
+      return data_out
+    
+    def assemble_command_u(self, u): #put together selected actions to a full send command template       
+      #start from a dummy =0 msg
+      data_out = self.get_cmd_stop() # 'SpoolOpenings' (10,)|'Signals': (6,)
+      #set cmds
+      data_out['SpoolOpenings'][0:len(u)] = u
+      data_out['Signals'] = [200]*6
+      return data_out
+
+
+          
 class dataThread(threading.Thread):
   '''Data acquisition thread.'''
   def __init__(self, kEvent, port_recv, recv_buffer):
@@ -150,8 +186,8 @@ class dataThread(threading.Thread):
     self.kEvent = kEvent
     self.lock = threading.Lock()
     self.currentData = None
-    self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
-    print("UDP Socket (for receiving data) initialized...")
+    # self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
+    # print("UDP Socket (for receiving data) initialized...")
     self.PORT = port_recv
     self.UDP_RECV_BUFF = recv_buffer
     self.HOST = ""
@@ -159,13 +195,18 @@ class dataThread(threading.Thread):
 
   def run(self):
     '''Data collection'''
-    self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    # self.sock.settimeout(5)
-    self.bind_socket()
+    #! these are disabled, seems to be a unity issue
+    # self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    # self.bind_socket()
+    #! 
+    ## self.sock.settimeout(5)
     rxData = None
     while not self.kEvent.wait(timeout=self.RECV_TIME): # better than self.kEvent.is_set() + time.sleep(SAMPLE_TIME)
         # "collect data"
         # time.sleep(self.SAMPLE_TIME)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        self.bind_socket()
         rxData, _ = self.sock.recvfrom(self.UDP_RECV_BUFF)
         # set data, use locking
         self.setData(rxData)
@@ -177,7 +218,7 @@ class dataThread(threading.Thread):
     try:
     # binding host and port
       self.sock.bind((self.HOST, self.PORT))
-      print('Socket_receive bind OK.')
+      # print('Socket_receive bind OK.')
     except socket.error as massage:
       # if any error occurs then with the 
       # help of sys.exit() exit from the program
@@ -202,4 +243,41 @@ class dataThread(threading.Thread):
     data = self.currentData
     self.lock.release()
     return data
-    
+
+class dataSendThread(threading.Thread): #experimental
+  '''Data send thread. To Simulink.'''
+  def __init__(self, recvThread, port_send):
+    threading.Thread.__init__(self,daemon=True)
+    self.ip, self.port_send = config.SIM_IP, port_send
+    self.kEvent = recvThread.kEvent
+    # self.lock = threading.Lock()
+    # self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
+    # print("UDP Socket (for receiving data) initialized...")
+    self.PORT = port_send
+    self.HOST = ""
+    self.send_TIME = config.SEND_TIME_EXTRA
+
+  def run(self):
+    '''Data collection'''
+    # self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    # self.sock.settimeout(5)
+    while not self.kEvent.wait(timeout=self.send_TIME): # better than self.kEvent.is_set() + time.sleep(SAMPLE_TIME)
+        # "collect data"
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
+        data = self.recvThread.getCurrentData()
+        self.send_cmd(data)
+
+    print('Data send to Simulink is signaled to stop...')
+    self.sock.close()
+    print('SOCKET (send Simulink) closed...')
+  
+  def send_cmd(self, dict_data): #send command through this function (a dictionary data)
+      try:
+          # MESSAGE = json.dumps(dataObj.__dict__) #Converting to json from OBJECT
+          MESSAGE = json.dumps(dict_data) #Converting to json from dict
+          self.soc_send.sendto(MESSAGE.encode(),(self.ip, self.port_send)) #Sending to simulator an encoded msg 
+          self.cmd_last = dict_data
+      except Exception as e:
+          print("Command Send Error:", e)
