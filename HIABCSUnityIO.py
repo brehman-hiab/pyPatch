@@ -8,6 +8,7 @@ import threading
 import time
 import os
 import pickle
+from ForwardKinematics import FKXY
 # ------ IO Module----- 
 '''
 *starts a thread to continuously recieve data, sends commands to sim  
@@ -123,11 +124,12 @@ class NEOSimIO():
 
     def print_states(self):
       #print selected states
+      x,y = FKXY(self.currentData) #x,y,z
       states = [f'{s:+07.2f}' for s in self.get_states()]
       states = " | ".join(states)
       actions = [f'{a:+04.0f}' for a in self.select_actions(self.u_control)]
       actions = " | ".join(actions)
-      print(f't: {self.currentTime:07.2f} - States: {states} - Control: {actions}')
+      print(f't: {self.currentTime:07.2f} - States: {states} - Control: {actions} - X: {x:07.3f}, Y: {y:07.3f}')
 
       # or all states ################
       # print(f'Time: {self.currentTime:.2f} - States: {self.currentData}\n Action: {self.u_control}')
