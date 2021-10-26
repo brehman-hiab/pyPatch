@@ -4,5 +4,6 @@
 from RemoteController import HIABRemoteController
 
 controller = HIABRemoteController()
+
 for _ in range(100000):
-    print(controller.get_last_remote_cmd())
+    print(controller.get_last_remote_msg()) #or get_last_remote_cmd()

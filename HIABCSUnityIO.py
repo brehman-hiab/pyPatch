@@ -107,6 +107,7 @@ class NEOSimIO():
           self.logCurrentData()
         #finish up    
         self.safeCompletion()
+        
     def getLeverMsg(self):
       return self.currentData['Lever']
 
